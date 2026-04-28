@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Paragraph & Essay Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* Base typography and scrollbar hiding */
+        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .font-serif {
+            font-family: 'Lora', serif;
+        }
+
+        .hide-scroll::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scroll {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Mandatory Chart Container Styling */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+
+<!-- Chosen Palette: Scholarly Neutrals (Warm stone backgrounds, deep slate text, rich teal and burnt orange accents for engagement without overwhelming the reader). -->
+<!-- Application Structure Plan: The SPA transforms a flat list of 10 paragraphs into an "Interactive Study Hub". It uses a dashboard approach. The top section introduces the content. The middle section provides a quantitative overview using a chart to show thematic distribution, allowing users to understand the scope of the topics at a glance. The core interactively is a split-pane "Explorer" section. The left pane provides a filterable, scannable list of topics. The right pane dynamically displays the selected text along with auto-generated metadata (word count, read time, extracted keywords) to elevate it from a simple text viewer to an analytical reading tool. -->
+<!-- Visualization & Content Choices: 
+1. Source: 10 Paragraphs -> Goal: Organize by Theme -> Viz: Chart.js Polar Area Chart -> Interaction: Hover to see counts, acts as a visual summary of content distribution -> Justification: Breaks up the text-heavy nature of the source document by providing a visual, quantitative breakdown of the topics.
+2. Source: Paragraph texts -> Goal: Readability and Discovery -> Viz: Split-pane interactive reader -> Interaction: Click list items to load text, category buttons to filter -> Justification: Allows students/users to browse topics without losing context or endlessly scrolling through a long document. 
+Library: Chart.js. Method: Vanilla JS DOM manipulation. Confirming NO SVG/Mermaid used. -->
+<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+<body class="bg-[#f8f6f0] text-slate-800 antialiased selection:bg-teal-200 selection:text-teal-900">
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        
+        <!-- Header Section -->
+        <header class="mb-12 text-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-teal-100 text-teal-700 text-3xl mb-4">
+                &#x1F4DA; <!-- Unicode Book Stack Icon -->
+            </div>
+            <h1 class="text-4xl md:text-5xl font-bold text-slate-900 mb-4 tracking-tight">Essential Study Paragraphs</h1>
+            <p class="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
+                Welcome to the Interactive Study Hub. This application organizes ten fundamental paragraphs into an easily navigable and analytical format. Explore topics ranging from daily life and social issues to education and personal hobbies.
+            </p>
+        </header>
+
+        <!-- Analytics Dashboard Section -->
+        <section class="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 mb-12">
+            <div class="max-w-3xl mx-auto text-center mb-8">
+                <h2 class="text-2xl font-bold text-slate-800 mb-3">Content Distribution Overview</h2>
+                <p class="text-slate-600 text-sm leading-relaxed">
+                    This section provides a quantitative breakdown of the available reading material. The visualization categorizes the 10 paragraphs into core themes. This helps you understand the overall focus of the collection—whether it leans more heavily towards social issues, educational topics, or daily life. 
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+                <!-- Summary Stats -->
+                <div class="lg:col-span-1 space-y-4">
+                    <div class="bg-[#f8f6f0] p-6 rounded-2xl border border-slate-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Topics</p>
+                            <p class="text-3xl font-bold text-slate-800 mt-1" id="stat-total">10</p>
+                        </div>
+                        <div class="text-3xl text-teal-600">&#x1F4DD;</div>
+                    </div>
+                    <div class="bg-[#f8f6f0] p-6 rounded-2xl border border-slate-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Words</p>
+                            <p class="text-3xl font-bold text-slate-800 mt-1" id="stat-words">0</p>
+                        </div>
+                        <div class="text-3xl text-orange-500">&#x1F4AC;</div>
+                    </div>
+                </div>
+
+                <!-- Chart Container -->
+                <div class="lg:col-span-2">
+                    <div class="chart-container">
+                        <canvas id="themeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interactive Explorer Section -->
+        <section class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            
+            <div class="p-8 border-b border-slate-100 bg-slate-50/50">
+                <div class="max-w-3xl">
+                    <h2 class="text-2xl font-bold text-slate-800 mb-3">Interactive Reader</h2>
+                    <p class="text-slate-600 text-sm leading-relaxed mb-6">
+                        Select a category below to filter the topics. Click on any title in the list to load the full text into the reading pane. The reader automatically analyzes the text to provide an estimated reading time and extracts key conceptual tags to aid in your study and comprehension.
+                    </p>
+                </div>
+                
+                <!-- Filters -->
+                <div class="flex flex-wrap gap-2" id="filter-controls">
+                    <button class="filter-btn active px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 bg-teal-700 text-white shadow-md" data-filter="All">All Topics</button>
+                    <button class="filter-btn px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-teal-300" data-filter="Society & Livelihood">Society & Livelihood</button>
+                    <button class="filter-btn px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-teal-300" data-filter="Global & National">Global & National</button>
+                    <button class="filter-btn px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-teal-300" data-filter="Education">Education</button>
+                    <button class="filter-btn px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-200 bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-teal-300" data-filter="Personal Life">Personal Life</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 min-h-[650px]">
+                
+                <!-- Left Sidebar: List -->
+                <div class="lg:col-span-4 border-r border-slate-200 bg-[#fbfaf9] hide-scroll overflow-y-auto max-h-[650px] p-4" id="paragraph-list">
+                    <!-- Populated by JS -->
+                </div>
+
+                <!-- Right Main: Reading Pane -->
+                <div class="lg:col-span-8 p-8 md:p-12 bg-white relative flex flex-col">
+                    <div id="reader-empty" class="absolute inset-0 flex items-center justify-center text-slate-400 flex-col hidden">
+                        <span class="text-5xl mb-4">&#x1F4D6;</span>
+                        <p>Select a paragraph from the list to begin reading.</p>
+                    </div>
+
+                    <div id="reader-content" class="max-w-2xl mx-auto w-full flex-grow flex flex-col">
+                        <!-- Metadata Header -->
+                        <div class="mb-8 border-b border-slate-200 pb-6">
+                            <div class="flex items-center gap-3 mb-4">
+                                <span id="reader-category" class="px-3 py-1 rounded-full text-xs font-bold tracking-wide uppercase bg-teal-100 text-teal-800"></span>
+                                <span class="text-slate-300">|</span>
+                                <span class="text-sm text-slate-500 font-medium flex items-center gap-1">
+                                    &#x23F1; <span id="reader-time">2 min read</span>
+                                </span>
+                            </div>
+                            <h3 id="reader-title" class="text-3xl md:text-4xl font-bold text-slate-900 leading-tight mb-4 font-serif"></h3>
+                            
+                            <!-- Keyword Tags -->
+                            <div class="flex flex-wrap gap-2" id="reader-tags">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Actual Text Content -->
+                        <div id="reader-text" class="font-serif text-lg text-slate-700 leading-relaxed space-y-6 mb-8 flex-grow">
+                            <!-- Populated by JS -->
+                        </div>
+
+                        <!-- Footer actions -->
+                        <div class="mt-auto pt-6 border-t border-slate-100 flex justify-between items-center">
+                            <div class="text-sm text-slate-500">
+                                Word count: <span id="reader-wordcount" class="font-semibold text-slate-700">0</span>
+                            </div>
+                            <button onclick="window.scrollTo({top: 0, behavior: 'smooth'})" class="text-teal-600 hover:text-teal-800 text-sm font-semibold transition-colors">
+                                Back to top &#x2191;
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        // --- DATA STORE ---
+        // Extracted directly from important_paragraphs.md
+        const paragraphData = [
+            {
+                id: 1,
+                title: "The Life of a Farmer",
+                category: "Society & Livelihood",
+                icon: "&#x1F33E;",
+                tags: ["Agriculture", "Hardship", "Rural Life", "Economy"],
+                content: "The life of a farmer is one of hard work and struggle. A farmer is the person who grows crops and provides food for the nation. Usually, he lives in a small hut in a village. He wakes up very early in the morning and goes to his field with his plough and oxen or a tractor. He works from dawn to dusk in the sun and rain. He prepares the soil, sows seeds, and looks after the growing plants. His happiness depends on a good harvest. If the crops are good, he and his family are happy. But if there is a flood or drought, his life becomes miserable. Despite his hard work, most farmers in our country are poor and live a simple life."
+            },
+            {
+                id: 2,
+                title: "Environment Pollution",
+                category: "Global & National",
+                icon: "&#x1F30D;",
+                tags: ["Ecology", "Health", "Global Warming", "Awareness"],
+                content: "Environment pollution is a serious global problem today. Our environment consists of air, water, soil, and surroundings. When these elements become dirty and harmful for living beings, it is called environment pollution. Air is polluted by smoke from factories and vehicles. Water is polluted by industrial waste, chemicals, and sewage. Soil is polluted by excessive use of pesticides and plastic. Noise from horns and machines causes sound pollution. Environment pollution leads to dangerous diseases and global warming. To save our lives, we must plant more trees, manage waste properly, and create public awareness."
+            },
+            {
+                id: 3,
+                title: "Our National Flag",
+                category: "Global & National",
+                icon: "&#x1F3F3;&#xFE0F;",
+                tags: ["Patriotism", "History", "Independence", "Symbol"],
+                content: "Our national flag is the symbol of our independence and sovereignty. Every independent nation has a flag of its own. Our flag is rectangular in shape with a ratio of 10:6. It has a bottle-green background with a bright red circle in the middle. The green color represents the youth and the green fields of Bangladesh, while the red circle symbolizes the sun of independence and the blood of the martyrs who sacrificed their lives in 1971. We hoist our flag on national holidays and in educational institutions. We feel very proud of our national flag and must always respect it."
+            },
+            {
+                id: 4,
+                title: "School Magazine",
+                category: "Education",
+                icon: "&#x1F4D3;",
+                tags: ["Creativity", "Writing", "Institution", "Culture"],
+                content: "A school magazine is a yearly publication of a school containing the writings of students and teachers. it is an important part of a school's identity. It usually contains poems, short stories, essays, and reports on school activities. A committee is formed to publish it, led by an editor. It provides a platform for students to express their hidden talents and creative ideas. When a student sees his or her name in print, it gives them great joy and encouragement. A school magazine reflects the academic and cultural life of the school and helps in developing the writing skills of the students."
+            },
+            {
+                id: 5,
+                title: "Your School Library",
+                category: "Education",
+                icon: "&#x1F3DB;&#xFE0F;",
+                tags: ["Knowledge", "Reading", "Study", "Resources"],
+                content: "A school library is a storehouse of knowledge for students and teachers. Our school has a large and well-organized library located in a quiet part of the building. It contains thousands of books on various subjects like literature, science, history, and biography. There are several almirahs where books are arranged neatly. There is also a spacious reading room where students can read peacefully. We have a librarian who helps us find the right books. A library helps us broaden our knowledge and encourages the habit of reading. It is a very important part of our school life."
+            },
+            {
+                id: 6,
+                title: "A Street Hawker",
+                category: "Society & Livelihood",
+                icon: "&#x1F6B6;",
+                tags: ["Urban Life", "Informal Economy", "Struggle", "Trade"],
+                content: "A street hawker is a person who sells various things by moving from street to street. He is a common figure in cities and towns. He usually carries his goods on his head, in a small handcart, or in a basket. He sells toys, clothes, fruits, utensils, and snacks. To attract customers, he makes peculiar cries or uses a bell. His life is very difficult as he has to walk long distances in all kinds of weather. He usually earns a very small amount of money and leads a poor life. Despite his struggles, he provides a useful service by bringing goods to our doorsteps."
+            },
+            {
+                id: 7,
+                title: "Importance of Learning English",
+                category: "Education",
+                icon: "&#x1F5E3;&#xFE0F;",
+                tags: ["Language", "Career", "Globalization", "Communication"],
+                content: "English is an international language and its importance is increasing day by day. In this era of globalization, English is the primary medium of communication between people of different countries. For higher education and better job opportunities, knowledge of English is a must. Most of the books on science, medicine, and technology are written in English. Moreover, the internet, which is the biggest source of information, is dominated by the English language. Without knowing English, a person cannot keep pace with the modern world. Therefore, we should learn English to become successful in our careers."
+            },
+            {
+                id: 8,
+                title: "A Life of a Rickshaw Puller",
+                category: "Society & Livelihood",
+                icon: "&#x1F6B2;",
+                tags: ["Labor", "Poverty", "Urban Transport", "Hardship"],
+                content: "A rickshaw puller is a person who earns his living by pulling a rickshaw. He is a familiar figure in our country. His life is full of hardship. He usually lives in a slum or a small hut. He works from morning till late at night, carrying passengers and goods. He has to pull the rickshaw in the scorching sun and heavy rain. He gets very little rest. Despite his hard labor, his income is very low and he can hardly maintain his family. When he falls ill, his family suffers greatly. We should always behave kindly with rickshaw pullers as they provide an essential service."
+            },
+            {
+                id: 9,
+                title: "A Road Accident",
+                category: "Global & National",
+                icon: "&#x1F6A8;",
+                tags: ["Safety", "Tragedy", "Traffic Rules", "Prevention"],
+                content: "A road accident is a common and tragic event in our daily life. It brings sudden death and sorrow to many families. Every day, we read about road accidents in the newspapers. There are many reasons for road accidents, such as reckless driving, narrow roads, unfit vehicles, and violation of traffic rules. Sometimes, drivers are not well-trained or they are under the influence of drugs. When an accident occurs, people lose their lives or become crippled for life. To prevent road accidents, the government should implement strict traffic laws, improve road conditions, and create awareness among drivers and pedestrians."
+            },
+            {
+                id: 10,
+                title: "Your Favourite Hobby",
+                category: "Personal Life",
+                icon: "&#x1F33F;",
+                tags: ["Leisure", "Gardening", "Nature", "Health"],
+                content: "A hobby is a favorite activity that a person does in his or her spare time for pleasure. My favorite hobby is gardening. I have a small garden in front of my house. In my free time, I dig the soil, plant seeds, and water the plants. I also use fertilizers to make the plants grow well. I have planted various kinds of flowers like roses, marigolds, and sunflowers. When the flowers bloom, the garden looks beautiful and a sweet scent fills the air. Gardening keeps me physically fit and mentally fresh. It gives me great joy to see my plants growing. It is a very productive way to spend my leisure time."
+            }
+        ];
+
+        // --- STATE MANAGEMENT ---
+        let currentFilter = 'All';
+        let activeId = 1;
+        let chartInstance = null;
+
+        // --- CORE FUNCTIONS ---
+        
+        function init() {
+            calculateOverallStats();
+            renderChart();
+            setupFilters();
+            renderList();
+            renderDetail(activeId);
+        }
+
+        function calculateWordCount(text) {
+            return text.trim().split(/\s+/).length;
+        }
+
+        function calculateOverallStats() {
+            let totalWords = 0;
+            paragraphData.forEach(p => {
+                totalWords += calculateWordCount(p.content);
+            });
+            document.getElementById('stat-words').textContent = totalWords.toLocaleString();
+        }
+
+        function renderChart() {
+            // Aggregate data by category
+            const categoryCounts = {};
+            paragraphData.forEach(p => {
+                categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1;
+            });
+
+            const labels = Object.keys(categoryCounts);
+            const data = Object.values(categoryCounts);
+
+            const ctx = document.getElementById('themeChart').getContext('2d');
+            
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'polarArea',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Number of Topics',
+                        data: data,
+                        backgroundColor: [
+                            'rgba(15, 118, 110, 0.7)', // Teal
+                            'rgba(249, 115, 22, 0.7)', // Orange
+                            'rgba(51, 65, 85, 0.7)',   // Slate
+                            'rgba(217, 119, 6, 0.7)'   // Amber
+                        ],
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            ticks: { display: false },
+                            grid: { color: 'rgba(0,0,0,0.05)' }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                font: { family: "'Inter', sans-serif", size: 13 },
+                                padding: 15,
+                                color: '#475569'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            padding: 12,
+                            titleFont: { family: "'Inter', sans-serif", size: 14 },
+                            bodyFont: { family: "'Inter', sans-serif", size: 14 },
+                            callbacks: {
+                                label: function(context) {
+                                    return ` ${context.label}: ${context.raw} Topics`;
+                                }
+                            }
+                        }
+                    },
+                    onClick: (event, elements) => {
+                        // Optional interactive drill-down from chart
+                        if (elements && elements.length > 0) {
+                            const index = elements[0].index;
+                            const clickedCategory = labels[index];
+                            triggerFilter(clickedCategory);
+                        }
+                    }
+                }
+            });
+        }
+
+        function setupFilters() {
+            const btns = document.querySelectorAll('.filter-btn');
+            btns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const filterValue = e.target.getAttribute('data-filter');
+                    triggerFilter(filterValue);
+                });
+            });
+        }
+
+        function triggerFilter(filterValue) {
+            currentFilter = filterValue;
+            
+            // Update UI buttons
+            const btns = document.querySelectorAll('.filter-btn');
+            btns.forEach(b => {
+                if(b.getAttribute('data-filter') === filterValue) {
+                    b.classList.remove('bg-white', 'text-slate-600', 'hover:bg-slate-50');
+                    b.classList.add('bg-teal-700', 'text-white', 'shadow-md');
+                } else {
+                    b.classList.add('bg-white', 'text-slate-600', 'hover:bg-slate-50');
+                    b.classList.remove('bg-teal-700', 'text-white', 'shadow-md');
+                }
+            });
+
+            const filteredData = currentFilter === 'All' ? paragraphData : paragraphData.filter(p => p.category === currentFilter);
+            
+            if(filteredData.length > 0) {
+                activeId = filteredData[0].id;
+                renderDetail(activeId);
+            } else {
+                activeId = null;
+                document.getElementById('reader-content').classList.add('hidden');
+                document.getElementById('reader-empty').classList.remove('hidden');
+            }
+
+            renderList();
+        }
+
+        function renderList() {
+            const listContainer = document.getElementById('paragraph-list');
+            listContainer.innerHTML = '';
+            
+            const filteredData = currentFilter === 'All' 
+                ? paragraphData 
+                : paragraphData.filter(p => p.category === currentFilter);
+
+            filteredData.forEach(item => {
+                const isActive = item.id === activeId;
+                const card = document.createElement('div');
+                
+                // Styling the list item based on state
+                card.className = `p-4 mb-3 rounded-2xl cursor-pointer transition-all duration-200 border-2 ${
+                    isActive 
+                    ? 'bg-white border-teal-500 shadow-sm' 
+                    : 'bg-white border-transparent hover:border-slate-200 hover:shadow-sm'
+                }`;
+                
+                card.innerHTML = `
+                    <div class="flex items-start gap-3">
+                        <div class="text-2xl mt-1 opacity-80">${item.icon}</div>
+                        <div>
+                            <h4 class="font-bold ${isActive ? 'text-teal-800' : 'text-slate-700'} text-base leading-snug mb-1">${item.title}</h4>
+                            <span class="text-[11px] font-semibold tracking-wider uppercase text-slate-400 bg-slate-100 px-2 py-0.5 rounded">${item.category}</span>
+                        </div>
+                    </div>
+                `;
+                
+                card.addEventListener('click', () => {
+                    activeId = item.id;
+                    renderList(); // re-render to update active styling
+                    renderDetail(item.id);
+                });
+                
+                listContainer.appendChild(card);
+            });
+        }
+
+        function renderDetail(id) {
+            if (!id) return;
+            
+            const item = paragraphData.find(p => p.id === id);
+            if (!item) return;
+
+            // Ensure content area is visible
+            document.getElementById('reader-empty').classList.add('hidden');
+            const contentArea = document.getElementById('reader-content');
+            contentArea.classList.remove('hidden');
+
+            // Populate data
+            document.getElementById('reader-category').textContent = item.category;
+            document.getElementById('reader-title').textContent = item.title;
+            
+            // Format content into actual paragraphs if needed (here it's one block, but we'll ensure it's clean)
+            document.getElementById('reader-text').innerHTML = `<p>${item.content}</p>`;
+            
+            // Generate Tags
+            const tagsContainer = document.getElementById('reader-tags');
+            tagsContainer.innerHTML = '';
+            item.tags.forEach(tag => {
+                const span = document.createElement('span');
+                span.className = 'px-2.5 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-md border border-slate-200';
+                span.textContent = `#${tag}`;
+                tagsContainer.appendChild(span);
+            });
+
+            // Calculate Metrics
+            const wordCount = calculateWordCount(item.content);
+            document.getElementById('reader-wordcount').textContent = wordCount;
+            
+            // Avg reading speed ~200 words per minute.
+            const readTimeMinutes = Math.max(1, Math.ceil(wordCount / 200));
+            document.getElementById('reader-time').textContent = `${readTimeMinutes} min read`;
+
+            // Simple transition effect
+            contentArea.style.opacity = '0';
+            contentArea.style.transform = 'translateY(10px)';
+            setTimeout(() => {
+                contentArea.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+                contentArea.style.opacity = '1';
+                contentArea.style.transform = 'translateY(0)';
+            }, 50);
+        }
+
+        // Initialize App on Load
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
